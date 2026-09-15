@@ -1,11 +1,11 @@
 """
-为知笔记导出工具包
+WizNote Export Toolkit
 
-主要模块：
-- wiz_client: 为知笔记客户端核心类
-- collaboration_parser: 协作笔记解析模块
-- note_exporter: 笔记导出模块
-- utils: 工具函数模块
+Основные модули:
+- wiz_client: Базовый класс клиента WizNote
+- collaboration_parser: Модуль для разбора заметок, предназначенных для совместной работы
+- note_exporter: Модуль для экспорта заметок
+- utils: Модуль вспомогательных функций
 """
 
 from .wiz_client import WizNoteClient
