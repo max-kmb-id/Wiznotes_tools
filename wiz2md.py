@@ -1,5 +1,5 @@
-"""批量转换老版为知笔记.md.ziw文件为标准markdown文件
-为知笔记只支持逐个笔记导出为markdown文件，此脚本可以从老版为知笔记数据文件夹自动搜索markdown方式记录的笔记文件，并批量导出为标准markdown文件。
+"""Пакетное преобразование устаревших файлов WizNote формата `.md.ziw` в стандартные файлы Markdown.
+WizNote поддерживает экспорт заметок в формат Markdown только по одной; данный скрипт автоматически находит заметки, созданные в формате Markdown, в папке с данными старой версии WizNote и выполняет их пакетный экспорт в виде стандартных файлов Markdown.
 """
 import pathlib
 import zipfile
@@ -8,21 +8,21 @@ from lxml import etree
 
 
 def get_markdown_files(data_path):
-    """获取.md.ziw文件列表"""
+    """Получить список файлов .md.ziw"""
     md_files = list(data_path.glob('**/*.md*.ziw'))
-    print(f'共发现{len(md_files)}个Markdown文件。')
+    print(f'Всего найдено{len(md_files)} Markdown-файл.')
     return md_files
 
 
 def ziw2md(md_file, export_md_path, tmp_path, abs_img_path=False):
-    """将.md.ziw文件转为标准md文件，导出图片和附件文件到本地目录"""
+    """Преобразуйте файлы .md.ziw в стандартные файлы .md и экспортируйте изображения и вложения в локальную директорию."""
     ziw_zip = zipfile.ZipFile(md_file)
     ziw_zip.extractall(tmp_path)
     ziw_zip.close()
 
-    print(f"正在转换《{md_file.stem}》……")
+    print(f"Преобразование...《{md_file.stem}》……")
     export_md_file = export_md_path.joinpath(md_file.parent.stem, md_file.stem.replace('.md', '')+'.md')
-    export_attachment_path = export_md_file.parent / export_md_file.stem   # 图片、附件保存目录
+    export_attachment_path = export_md_file.parent / export_md_file.stem   # Директория для сохранения изображений и вложений
 
     with open(tmp_path / 'index.html', encoding='utf-16') as f1:
         content = f1.read()
@@ -45,30 +45,30 @@ def ziw2md(md_file, export_md_path, tmp_path, abs_img_path=False):
         content = content.replace('</body></html>', '')
         # content = html2text.html2text(content)
         content = content.replace(r'\---', '---').strip()
-        content = re.sub(r'<ed_tag name="markdownimage" .*?</ed_tag>', '', content).strip()   # 替换包含图片链接文件的文末内容
+        content = re.sub(r'<ed_tag name="markdownimage" .*?</ed_tag>', '', content).strip()   # Замените содержимое в конце текста, содержащее файлы со ссылками на изображения.
         '''
         tree = etree.HTML(content)
         content = tree.xpath('//body')[0].xpath('string(.)')
 
-        # 将图片文件链接改为相应目录
+        # Измените ссылки на файлы изображений, указав соответствующие директории.
         if abs_img_path:
             content = content.replace('index_files', str(export_attachment_path))
         else:
             content = content.replace('index_files', export_attachment_path.stem)
 
-    # 分目录输出markdown文件
+    # Вывод Markdown-файлов, упорядоченных по каталогам
     if not (export_md_path / md_file.parent.stem).exists():
         (export_md_path / md_file.parent.stem).mkdir()
     with open(export_md_file, 'w', encoding='utf-8') as f2:
         f2.write(content)
     print(f'已导出：{export_md_file}。')
 
-    # 将index_files目录下图片文件复制到以markdown文件标题命名的目录
+    # Скопируйте файлы изображений из каталога `index_files` в каталог, названный в честь заголовка Markdown-файла.
     if (tmp_path / 'index_files').exists():
         # shutil.copytree((tmp_path / 'index_files'), export_attachment_path, dirs_exist_ok=True)
         (tmp_path / 'index_files').rename(export_attachment_path)
 
-    # 将附件目录下文件复制到以markdown文件标题命名的目录
+    # Скопируйте файлы из каталога вложений в каталог, названный в честь заголовка Markdown-файла.
     attachment_path = md_file.parent.joinpath(md_file.stem, '.md_Attachments')
     if attachment_path.exists():
         if not export_attachment_path.exists():
@@ -83,13 +83,13 @@ if __name__ == "__main__":
     export_md_path = pathlib.Path(r'C:\QMDownload\Backup\Wiz Knowledge\exported_md')
     tmp_path = export_md_path / 'temp'
 
-    keyword = '困境与解法'
+    keyword = 'Проблемы и решения'
 
     md_files = get_markdown_files(wizdata_path)
     for md_file in md_files:
-        # 导出全部markdown文件
+        # Экспортировать все файлы Markdown
         if not keyword:
             ziw2md(md_file, export_md_path, tmp_path, abs_img_path=False)
-        # 只导出文件名包含指定关键字的markdown文件
+        # Экспортировать только те файлы Markdown, в именах которых содержится указанное ключевое слово.
         elif keyword in md_file.stem:
             ziw2md(md_file, export_md_path, tmp_path, abs_img_path=False)
