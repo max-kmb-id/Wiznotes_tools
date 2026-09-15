@@ -1,4 +1,4 @@
-"""逐月生成日记模板"""
+"""Создавать шаблоны ежемесячных журналов"""
 import pathlib
 from datetime import date, datetime
 import calendar
@@ -14,14 +14,14 @@ with open(template, encoding='utf-8') as f:
 
 for month in range(1, 13):
     day_count = calendar.monthrange(year, month)[1]
-    month_content = f'# {year}年{month}月日记\n\n'
+    month_content = f'# {year}Год{month}Ежемесячный дневник\n\n'
     for day in range(1, day_count+1):
         today = date(year, month, day)
-        first_line = f"## {today} {datetime.strftime(today, '%A')[:3]} 晴\n"
+        first_line = f"## {today} {datetime.strftime(today, '%A')[:3]} прозрачный\n"
         content = first_line + base_content + '\n\n'
         month_content += content
 
     with open(path / f'{year}-{month:0>2d}.md', 'w', encoding='utf-8') as f:
         f.write(month_content)
 
-print(f"已在{path.absolute()}目录下生成{year}年每月日记模板。")
+print(f"Уже участвую{path.absolute()}Сгенерировать в директории{year}Шаблон ежедневника (годовой/месячный)。")
