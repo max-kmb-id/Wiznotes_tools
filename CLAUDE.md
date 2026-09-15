@@ -1,99 +1,94 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Этот файл содержит инструкции для Claude Code (claude.ai/code) по работе с кодом в данном репозитории.
 
-## 项目概述
+## Обзор проекта
 
-为知笔记（WizNote）批量操作脚本工具集。核心功能是通过 Web API 批量导出为知笔记（支持 HTML 笔记、Lite Markdown 笔记、协作笔记），并提供笔记完整性校验。另有若干历史辅助脚本用于将剪贴板/图片等内容保存到为知笔记。
+Набор скриптов для пакетной обработки данных в WizNote. Основной функционал включает пакетный экспорт заметок WizNote (поддерживаются заметки в форматах HTML, Lite Markdown и совместные заметки) через Web API, а также проверку целостности экспортированных заметок. Также в проект включены вспомогательные скрипты (в том числе устаревшие) для сохранения контента — например, данных из буфера обмена или изображений — в WizNote.
 
-## 常用命令
+## Основные команды
 
 ```bash
-# 安装依赖
+# Установка зависимостей
 pip install -r export_wiznotes/requirements.txt
-pip install -r web/requirements.txt  # Web UI 额外依赖
+pip install -r web/requirements.txt  # Дополнительные зависимости для Web UI
 
-# === Web UI 模式（推荐）===
-python web/app.py  # 启动 Web 服务，默认 http://127.0.0.1:8000
+# === Режим Web UI (рекомендуется) ===
+python web/app.py  # Запуск веб-сервиса; по умолчанию: http://127.0.0.1:8000
 
-# === CLI 模式 ===
-# 生成文件夹列表和笔记清单（在 export_wiznotes 目录下运行）
+# === Режим CLI ===
+# Генерация списков папок и заметок (запускать внутри директории export_wiznotes)
 cd export_wiznotes
 python get_folders_and_notes_list.py
 
-# 批量导出笔记（在项目根目录运行，读取 output/为知笔记目录.log）
+# Пакетный экспорт заметок (запускать из корня проекта; считывает output/为知笔记目录.log)
 python get_wiz_notes.py
 
-# 统计已导出的本地笔记
+# Подсчет экспортированных локальных заметок
 cd export_wiznotes
 python get_exported_mdfiles.py
 
-# 对比在线笔记与已导出笔记的差异
+# Сравнение онлайн-заметок с экспортированными копиями
 cd export_wiznotes
 python compare_notes_in_folders.py
 ```
 
-## 架构
+## Архитектура
 
-### 核心导出模块 (`export_wiznotes/`)
+### Основной модуль экспорта (`export_wiznotes/`)
 
-- **`wiz_client.py`** — 为知笔记 Web API 客户端。封装登录（获取 token）、文件夹列表、笔记列表（含超 1000 条双向查询去重）、笔记下载（含协作笔记 WebSocket 获取）、资源/附件下载、标签获取等接口。API 基地址 `https://as.wiz.cn`，认证通过 `X-Wiz-Token` header。
-- **`note_exporter.py`** — 笔记导出主逻辑。按文件夹遍历笔记，下载内容并转换为 Markdown/HTML，自动下载图片和附件到 `_assets` 目录，添加 YAML front matter（包含 docGuid、创建/修改时间、标签等元数据），支持断点续传（`.export_checkpoint.json`）。
-- **`collaboration_parser.py`** — 协作笔记解析。通过 WebSocket（`wss://`）协议获取协作笔记的 JSON 块结构，解析为 Markdown 格式（支持文本、列表、代码块、表格、嵌入块等类型）。
-- **`utils.py`** — 日志配置（文件 DEBUG + 控制台 INFO）和文件夹/笔记列表工具函数。
-- **`get_folders_and_notes_list.py`** — 导出为知笔记的文件夹结构和笔记清单到 `output/` 目录。
-- **`get_exported_mdfiles.py`** — 扫描本地 `output/` 目录统计已导出的 md 文件。
-- **`compare_notes_in_folders.py`** — 对比在线笔记清单与本地导出笔记清单，生成差异报告。
+- **`wiz_client.py`** — Клиент для Web API WizNote. Инкапсулирует интерфейсы для авторизации (получение токена), получения списков папок и заметок (включая дедупликацию при двусторонних запросах, превышающих 1000 элементов), загрузки заметок (включая использование WebSocket для совместных заметок), загрузки ресурсов/вложений и получения тегов. Базовый URL API: `https://as.wiz.cn`; аутентификация через заголовок `X-Wiz-Token`.
+- **`note_exporter.py`** — Основная логика экспорта заметок. Обходит заметки по папкам, скачивает контент и преобразует его в формат Markdown/HTML, автоматически загружает изображения и вложения в директорию `_assets`, добавляет YAML-заголовок (содержащий метаданные, такие как `docGuid`, время создания/изменения и теги), а также поддерживает возобновление прерванного экспорта (через файл `.export_checkpoint.json`).
+- **`collaboration_parser.py`** — Обрабатывает совместные заметки. Получает JSON-структуру блоков совместных заметок по протоколу WebSocket (`wss://`) и преобразует её в формат Markdown (с поддержкой текста, списков, блоков кода, таблиц, встроенных блоков и т. д.).
+- **`utils.py`** — Отвечает за настройку логирования (уровень DEBUG для файлов, уровень INFO для консоли) и предоставляет вспомогательные функции для управления папками и списками заметок.
+- **`get_folders_and_notes_list.py`** — Экспортирует структуру папок и список заметок WizNote в директорию `output/`.
+- **`get_exported_mdfiles.py`** — Сканирует локальную директорию `output/` для подсчета экспортированных Markdown-файлов.
+- **`compare_notes_in_folders.py`** — Сравнивает список заметок на сервере с локально экспортированным списком и формирует отчет о расхождениях.
 
-### Web UI 模块 (`web/`)
+### Модуль веб-интерфейса (`web/`)
 
-基于 FastAPI 的本地 Web 服务，通过浏览器完成所有笔记导出操作。
+Локальный веб-сервис на базе FastAPI, позволяющий выполнять все операции по экспорту заметок через веб-браузер. - **`app.py`** — Точка входа приложения FastAPI; инициализирует `WebSocketManager`, `TaskManager` и `WebLogHandler`.
+- **`deps.py`** — Общий экземпляр `Jinja2Templates` (для предотвращения циклических импортов).
+- **`config.py`** — Пути по умолчанию и константы конфигурации.
+- **`models.py`** — Модели запросов и ответов Pydantic.
+- **`routers/auth.py`** — Эндпоинты для входа, выхода и настройки конфигурации (`POST /api/login`, `GET /api/config/credentials`).
+- **`routers/folders.py`** — Просмотр дерева папок (`GET /api/folders`) и списка заметок (`GET /api/folders/{path}/notes`). - **`routers/export.py`** — Управление задачами экспорта (`POST /api/export`) + обновление прогресса в реальном времени через WebSocket (`/ws/export/{task_id}`, `/ws/logs`).
+- **`routers/stats.py`** — Статистическое сканирование (`POST /api/stats/scan`), сравнение (`POST /api/stats/compare`) и просмотр логов/точек останова (breakpoints).
+- **`services/export_service.py`** — `TaskManager` управляет потоками экспорта; поддерживает отмену на уровне папки.
+- **`services/folder_service.py`** — Построение дерева папок (преобразование плоского списка путей в иерархическую древовидную структуру).
+- **`services/stats_service.py`** — Локальное сканирование, сравнение в режиме онлайн и получение списка логов/точек останова.
+- **`websocket_manager.py`** — Пул соединений WebSocket; поддерживает потоковую передачу логов и трансляцию прогресса выполнения задач.
+- **`logging_handler.py`** — Кастомный `logging.Handler`, который анализирует сообщения лога с помощью регулярных выражений для извлечения структурированных событий прогресса.
 
-- **`app.py`** — FastAPI 应用入口，初始化 WebSocketManager、TaskManager、WebLogHandler
-- **`deps.py`** — 共享 Jinja2Templates 实例（避免循环导入）
-- **`config.py`** — 默认路径和配置常量
-- **`models.py`** — Pydantic 请求/响应模型
-- **`routers/auth.py`** — 登录/登出/配置端点（`POST /api/login`、`GET /api/config/credentials`）
-- **`routers/folders.py`** — 文件夹树浏览（`GET /api/folders`）和笔记列表（`GET /api/folders/{path}/notes`）
-- **`routers/export.py`** — 导出任务管理（`POST /api/export`）+ WebSocket 实时进度（`/ws/export/{task_id}`、`/ws/logs`）
-- **`routers/stats.py`** — 统计扫描（`POST /api/stats/scan`）、对比（`POST /api/stats/compare`）、日志和断点查看
-- **`services/export_service.py`** — TaskManager 管理导出线程，文件夹级取消粒度
-- **`services/folder_service.py`** — 文件夹树构建（扁平路径→嵌套树）
-- **`services/stats_service.py`** — 本地扫描、在线对比、日志/断点列表
-- **`websocket_manager.py`** — WebSocket 连接池，支持日志流和任务进度广播
-- **`logging_handler.py`** — 自定义 logging.Handler，通过正则解析日志消息提取结构化进度事件
+**Мост между синхронным и асинхронным кодом**: Весь синхронный код из `export_wiznotes` адаптирован: `asyncio.to_thread()` оборачивает быстрые операции, `threading.Thread` выполняет длительные задачи экспорта, а `asyncio.run_coroutine_threadsafe()` передает события лога в WebSocket. В веб-контексте `tqdm` заменен на заглушку (no-op). ### Основная точка входа (`get_wiz_notes.py`)
 
-**同步→异步桥接**: `export_wiznotes` 全部同步代码，通过 `asyncio.to_thread()` 包装快速操作，`threading.Thread` 运行长时导出，`asyncio.run_coroutine_threadsafe()` 将日志事件推送到 WebSocket。tqdm 在 Web 上下文中被替换为 noop。
+Считывает список папок из файла `export_wiznotes/output/为知笔记目录.log` и использует `ThreadPoolExecutor` (по умолчанию 10 потоков) для параллельного экспорта заметок из каждой папки.
 
-### 主入口 (`get_wiz_notes.py`)
+### Обработка типов заметок
 
-读取 `export_wiznotes/output/为知笔记目录.log` 中的文件夹列表，使用 `ThreadPoolExecutor`（默认 10 线程）并行导出每个文件夹的笔记。
+- **HTML-заметки** (устаревший формат): Загрузка HTML-контента и его преобразование в Markdown с помощью `markdownify`.
+- **Lite Markdown-заметки** (новый формат): Прямое извлечение Markdown-контента.
+- **Заметки для совместной работы** (`type='collaboration'`): Получение фрагментов данных JSON через WebSocket и их преобразование в Markdown с помощью `CollaborationParser`.
 
-### 笔记类型处理
+### Конфигурация
 
-- **HTML 笔记**（旧版）：下载 HTML 内容，用 `markdownify` 转换为 Markdown
-- **Lite Markdown 笔记**（新版）：直接提取 Markdown 内容
-- **协作笔记**（`type='collaboration'`）：通过 WebSocket 获取 JSON 块数据，由 `CollaborationParser` 解析为 Markdown
-
-### 配置
-
-账号配置使用项目根目录的 `.env` 文件（参考 `.env.example`），格式：
+Настройка учетной записи выполняется через файл `.env` в корне проекта (см. `.env.example`); формат:
 ```env
 WIZ_USERNAME=your_email@example.com
 WIZ_PASSWORD=your_password
 ```
 
-### 其他辅助脚本（项目根目录）
+### Другие вспомогательные скрипты (в корне проекта)
 
-- `clipboard_notes_mailto_wiznotes.py` — 从剪贴板提取微信/头条等链接，通过邮件保存到为知笔记
-- `image2wiz_by_yagmail.py` — 图片及 OCR 文本批量发送到为知笔记
-- `create_wiznotes_with_webapi.py` — 通过 Web API 创建笔记
-- `check_undone_imgs.py` — 检查未成功发送的图片文件
+- `clipboard_notes_mailto_wiznotes.py` — Извлекает ссылки (например, из WeChat или Toutiao) из буфера обмена и сохраняет их в WizNote через электронную почту.
+- `image2wiz_by_yagmail.py` — Пакетная отправка изображений и текста, распознанного с помощью OCR, в WizNote.
+- `create_wiznotes_with_webapi.py` — Создание заметок через Web API.
+- `check_undone_imgs.py` — Проверка наличия изображений, которые не удалось отправить.
 
-## 开发注意事项
+## Заметки по разработке
 
-- 路径处理兼容 Windows（`_get_valid_filename` 替换 `\ / : * ? " < > |`）
-- API 单次最多返回 1000 条笔记，超大文件夹通过双向查询（降序+升序）+ GUID 去重处理
-- 断点续传通过每 10 篇笔记保存一次 checkpoint 实现
-- 导出时每篇笔记间隔 0.5 秒避免请求过快
-- 文件名中的 `.` 可能导致 `Path.with_suffix` 截断问题，代码中直接拼接扩展名规避
+- Обработка путей совместима с Windows (функция `_get_valid_filename` заменяет символы `\ / : * ? " < > |`).
+- API возвращает максимум 1000 заметок за запрос; для обработки очень больших папок используются двунаправленные запросы (в порядке убывания и возрастания) в сочетании с дедупликацией по GUID.
+- Реализована возможность возобновления работы после прерывания: контрольная точка сохраняется каждые 10 заметок.
+- Между операциями экспорта заметок предусмотрена задержка в 0,5 секунды во избежание превышения допустимой частоты запросов.
+- Точки (`.`) в именах файлов могут вызывать проблемы с обрезкой имени при использовании `Path.with_suffix`; в коде это предотвращается путем ручного добавления расширения файла.
