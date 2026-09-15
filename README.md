@@ -71,7 +71,7 @@ cd export_wiznotes
 python get_folders_and_notes_list.py
 ```
 В зависимости от параметров конфигурации можно сгенерировать:
-- `./output/为知笔记目录.log` — список папок (по умолчанию)
+- `./output/WizNote_Directory.log` — список папок (по умолчанию)
 - `./output/folders & notes.txt` — подробный перечень заметок
 
 #### 4. Пакетный экспорт заметок
