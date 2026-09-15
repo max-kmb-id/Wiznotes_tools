@@ -1,6 +1,6 @@
 """
-笔记导出模块
-包含笔记导出、文件处理、断点续传等功能
+Модуль экспорта заметок
+Включает такие функции, как экспорт заметок, обработка файлов и возобновление работы с места остановки.
 """
 
 import json
@@ -25,30 +25,30 @@ class NoteExporter:
         self.client = client
 
     def export_notes(self, folder, export_dir='export_wiznotes/output', max_notes=1000, resume=True, reexport_dot_files=False):
-        """导出某文件夹下所有笔记，支持断点续传
+        """Экспорт всех заметок из определенной папки с поддержкой возобновления прерванной передачи.
 
         Args:
-            folder: 文件夹路径
-            export_dir: 导出目录
-            max_notes: 最大获取笔记数量
-            resume: 是否启用断点续传
-            reexport_dot_files: 是否强制重新导出文件名中包含"."的笔记（用于修复之前的导出问题）
+            folder: Путь к папке
+            export_dir: Каталог экспортеров
+            max_notes: Максимальное количество заметок для получения
+            resume: Включить возобновление с контрольной точки?
+            reexport_dot_files: Принудительно ли выполнять повторный экспорт заметок, в именах файлов которых содержится символ «.» (для исправления проблем, возникших при предыдущем экспорте)
         """
         try:
-            # 创建导出目录
+            # Создать каталог для экспорта
             export_path = Path(export_dir)
             export_path.mkdir(parents=True, exist_ok=True)
 
-            # 修改文件夹路径处理逻辑
+            # Измените логику обработки пути к папке.
             folder_parts = folder.strip('/').split('/')
             current_path = export_path
             for part in folder_parts:
-                # 处理文件夹名中的特殊字符
+                # Обработка специальных символов в именах папок
                 safe_part = self._get_valid_filename(Path(part))
                 current_path = current_path / safe_part
                 current_path.mkdir(parents=True, exist_ok=True)
 
-            # 检查断点续传文件
+            # Проверьте файлы для возобновления с контрольной точки.
             checkpoint_file = current_path / '.export_checkpoint.json'
             exported_guids = set()
 
@@ -57,70 +57,73 @@ class NoteExporter:
                     with open(checkpoint_file, 'r', encoding='utf-8') as f:
                         checkpoint_data = json.load(f)
                         exported_guids = set(checkpoint_data.get('exported_guids', []))
-                    logging.info(f"从断点恢复，已导出 {len(exported_guids)} 篇笔记")
+                    logging.info(f"Возобновлено с контрольной точки; экспорт завершен. {len(exported_guids)} Заметка")
                 except Exception as e:
-                    logging.warning(f"读取断点文件失败: {e}")
+                    logging.warning(f"Не удалось прочитать файл точек останова.: {e}")
 
-            # 获取所有标签映射
+            # Получить все сопоставления меток.
             tag_map = self.client.get_all_tags()
 
-            # 获取文件夹下所有笔记（自动处理超过1000条笔记的情况）
-            logging.info(f"开始获取文件夹 {folder} 下的所有笔记...")
+            # Получить все заметки из папки (автоматическая обработка случаев, когда количество заметок превышает 1000).
+            logging.info(f"Начало извлечения папки {folder} Все заметки в разделе...")
             note_list = get_all_notes_in_folder(self.client, folder)
             total_notes = len(note_list)
             exported_count = 0
-            logging.info(f"共获取到 {total_notes} 篇笔记")
+            logging.info(f"Успешно получено в общей сложности {total_notes} Заметка")
 
-            # 使用tqdm显示进度
-            for note in tqdm(note_list, desc="导出笔记", unit="篇"):
+            # Используйте tqdm для отображения прогресса.
+            for note in tqdm(note_list, desc="Экспорт заметок", unit="Статья"):
                 try:
                     doc_guid = note['docGuid']
                     note_title = note.get('title', 'Untitled')
 
-                    # 检查是否已导出
+                    # Проверьте, было ли это экспортировано.
                     skip_export = False
                     if doc_guid in exported_guids:
-                        # 如果启用了重新导出包含"."的文件名，且文件名包含"."，则不跳过
+                        # Если включен реэкспорт имен файлов, содержащих символ «.», и имя файла содержит этот символ, то такой файл не будет пропущен.
                         if reexport_dot_files and '.' in note_title:
-                            # 检查"."是否为真正的文件扩展名
+                            # Проверьте, является ли «.» подлинным расширением файла.
                             if note_title.lower().endswith(('.md', '.txt', '.html', '.htm')):
-                                # 如果以常见扩展名结尾，跳过（已经是真正的扩展名）
+                                # Пропустить, если имя заканчивается на распространенное расширение (это уже настоящее расширение).
                                 skip_export = True
                             else:
-                                # 包含"."但不是真正的扩展名，强制重新导出
-                                logging.info(f"强制重新导出包含'.'的笔记: 《{note_title}》")
+                                # Содержит «.», но не является настоящим расширением файла; принудительный повторный экспорт.
+                                logging.info(f"Принудительно повторно экспортировать заметки, содержащие «.».: 《{note_title}》")
                                 skip_export = False
 
-                                # 清理可能存在的旧的截断文件
+                                # Удалите все потенциально существующие старые усеченные файлы.
                                 self._cleanup_old_truncated_files(current_path, note_title)
                         else:
                             skip_export = True
 
                     if skip_export:
-                        logging.debug(f"跳过已导出的笔记: 《{note_title}》")
+                        logging.debug(f"Пропустить экспортированные заметки: 《{note_title}》")
                         exported_count += 1
                         continue
 
-                    logging.info(f"\n开始下载笔记:《{note_title}》")
+                    logging.info(f"\nНачать скачивание заметок:《{note_title}》")
                     note_content = self.client.download_note(doc_guid)
 
-                    # 创建资源目录（同时用于保存资源文件和附件）
+                    # Создайте каталог ресурсов (используемый для хранения как файлов ресурсов, так и вложений).
                     safe_title = self._get_valid_filename(note_title)
                     if safe_title.lower().endswith('.md'):
-                        safe_title = safe_title[:-3]  # 去掉 .md 后缀
-                    note_assets_dir = current_path / f"{safe_title}_assets"
+                        safe_title = safe_title[:-3]
+                    
+                    # Формируем имя каталога ресурсов без пробелов
+                    assets_dir_name = re.sub(r'\s+', '_', safe_title)
+                    note_assets_dir = current_path / f"{assets_dir_name}_assets"
 
-                    # 处理HTML内容
+                    # Обработка HTML-контента
                     html_content = note_content['html']
                     note_type = note_content.get('type', 'document')
 
-                    # 根据笔记类型处理资源
+                    # Обработка ресурсов в зависимости от типа заметки
                     if note_type == 'collaboration':
-                        # 协作笔记的资源处理
+                        # Управление ресурсами для совместных заметок
                         html_content = self._process_collaboration_resources(doc_guid, html_content, note_assets_dir)
                     else:
-                        # 普通笔记的资源处理
-                        # 处理资源文件
+                        # Управление ресурсами для стандартных заметок
+                        # Обработать файлы ресурсов
                         resources = note_content.get('resources', [])
                         if resources:
                             note_assets_dir.mkdir(exist_ok=True)
@@ -132,12 +135,12 @@ class NoteExporter:
 
                                 resource_path = note_assets_dir / resource_name
                                 if self.client.download_resource(doc_guid, resource, resource_path):
-                                    # 替换HTML中的资源链接为相对路径
+                                    # Замените ссылки на ресурсы в HTML на относительные пути.
                                     old_url = f"index_files/{resource_name}"
                                     new_path = f'{note_assets_dir.name}/{resource_name}'
                                     html_content = html_content.replace(old_url, new_path)
 
-                        # 处理附件
+                        # Обработать вложения
                         attachments = self.client.get_note_attachments(doc_guid)
                         if attachments:
                             note_assets_dir.mkdir(exist_ok=True)
@@ -148,38 +151,38 @@ class NoteExporter:
                                 if not att_name or not att_guid:
                                     continue
 
-                                # 下载附件到assets目录
+                                # Скачайте вложение в каталог ресурсов.
                                 att_path = note_assets_dir / att_name
                                 if self.client.download_attachment(doc_guid, att_guid, att_path):
-                                    # logging.info(f"成功下载附件: {att_name}")
+                                    # logging.info(f"Вложение успешно загружено.: {att_name}")
 
-                                    # 在笔记中添加附件链接
+                                    # Добавить ссылки на вложения в заметки
                                     att_link = f'<p>附件: <a href="{note_assets_dir.name}/{att_name}">{att_name}</a></p>'
                                     html_content = html_content.replace('</body>', f'{att_link}</body>')
 
-                    # 保存笔记内容
+                    # Сохранить содержимое заметки
                     note_path = current_path / safe_title
                     if note_type == 'collaboration' or note_title.lower().endswith('.md'):
-                        # 修复：避免with_suffix在点号处截断文件名，直接拼接扩展名
+                        # Исправление: предотвратить усечение имени файла на точке в методе `with_suffix`; вместо этого — просто добавлять расширение.
                         note_path = current_path / f"{safe_title}.md"
-                        # 对于协作笔记，内容已经是Markdown格式
+                        # В случае с совместными заметками контент уже представлен в формате Markdown.
                         if note_type == 'collaboration':
-                            # 为协作笔记添加front matter
+                            # Добавить в совместные заметки front matter
                             note_info = note_content.get('info', {})
-                            # 清理可能的错误代码块包装
+                            # Упорядочить обертки блоков кода, обрабатывающих потенциальные ошибки.
                             html_content = self._clean_markdown_wrapping(html_content)
                             content = self._add_front_matter(html_content, note_info, tag_map)
                         else:
-                            # 提取<body>标签内的内容
+                            # Извлеките содержимое внутри тегов <body>.
                             body_match = re.search(r'<body[^>]*>([\s\S]*?)</body>', html_content, re.IGNORECASE)
                             if body_match:
                                 html_content = body_match.group(1)
-                            # 修复HTML转文本的换行符处理
+                            # Исправлена ​​обработка разрывов строк при преобразовании HTML в текст.
                             content = self._fix_html_to_text_conversion(html_content)
-                            # 清理可能的错误代码块包装
+                            # Упорядочить обертки блоков кода, обрабатывающих потенциальные ошибки.
                             content = self._clean_markdown_wrapping(content)
                     else:
-                        # 修复：避免with_suffix在点号处截断文件名，直接拼接扩展名
+                        # Исправление: предотвратить усечение имени файла на точке в методе `with_suffix`; вместо этого — просто добавлять расширение.
                         note_path = current_path / f"{safe_title}.html"
                         content = f"""<!DOCTYPE html>
 <html>
@@ -195,11 +198,11 @@ class NoteExporter:
                     with open(note_path, 'w', encoding='utf-8') as f:
                         f.write(content)
 
-                    # 额外保存md文件，保留格式
-                    # 修复：避免with_suffix在点号处截断文件名，直接拼接扩展名
+                    # Кроме того, сохраните как MD-файл, сохранив форматирование.
+                    # Исправление: предотвратить усечение имени файла на точке в методе `with_suffix`; вместо этого — просто добавлять расширение.
                     md_path = current_path / f"{safe_title}.md"
-                    if note_type != 'collaboration':  # 协作笔记已经保存为md，不需要再次转换
-                        # 对于lite/markdown类型的笔记，不需要markdownify处理，直接使用已处理的内容
+                    if note_type != 'collaboration':  # Совместные заметки уже сохранены в формате Markdown; дополнительное преобразование не требуется.
+                        # Для заметок в формате «lite» или стиле Markdown обработка с помощью Markdownify не требуется; уже обработанное содержимое используется напрямую.
                         if note_type == 'lite/markdown' or note_title.lower().endswith('.md'):
                             # lite/markdown类型的笔记已经在前面处理过了，只需要添加front matter
                             note_info = note_content.get('info', {})
@@ -223,44 +226,44 @@ class NoteExporter:
                         with open(md_path, 'w', encoding='utf-8') as f:
                             f.write(md_content)
 
-                    # 更新导出状态
+                    # Обновить статус экспорта
                     exported_guids.add(doc_guid)
                     exported_count += 1
-                    logging.info(f"导出笔记成功: 《{note_title}》\n")
+                    logging.info(f"Заметки успешно экспортированы.: 《{note_title}》\n")
 
-                    # 每导出10篇笔记保存一次断点
+                    # Сохраняйте контрольную точку после экспорта каждых 10 заметок.
                     if exported_count % 10 == 0:
                         self._save_checkpoint(checkpoint_file, exported_guids)
 
-                    # 添加延时避免请求过快
+                    # Добавьте задержку, чтобы избежать слишком частой отправки запросов.
                     time.sleep(0.5)
 
                 except Exception as e:
-                    logging.error(f"导出笔记 《{note_title}》 失败: {e}")
+                    logging.error(f"Экспорт заметок 《{note_title}》 неудача: {e}")
                     continue
 
-            # 导出完成后保存最终断点
+            # Сохраните финальную точку останова после завершения экспорта.
             self._save_checkpoint(checkpoint_file, exported_guids)
 
-            logging.info(f"导出完成，共导出 {exported_count}/{total_notes} 篇笔记")
+            logging.info(f"Экспорт завершен; всего экспортировано: {exported_count}/{total_notes} Заметка")
 
         except Exception as e:
-            logging.error(f"导出笔记失败: {e}")
+            logging.error(f"Не удалось экспортировать заметки.: {e}")
             raise
 
     def _add_front_matter(self, md_content, note_info, tag_map):
-        """添加YAML front matter到Markdown内容"""
-        # 确保md_content不为None
+        """Добавьте YAML-заголовок (front matter) к содержимому в формате Markdown."""
+        # Убедитесь, что md_content не равно None.
         if md_content is None:
             md_content = ""
 
-        # 首先清理可能的错误代码块包装
+        # Сначала удалите все возможные обертки блоков кодов ошибок.
         md_content = self._clean_markdown_wrapping(md_content)
 
         def parse_timestamp(ts):
             try:
                 ts = int(ts)
-                if ts > 1e12:  # 毫秒级
+                if ts > 1e12:  # Уровень миллисекунд
                     ts = ts // 1000
                 return datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
             except Exception:
@@ -303,34 +306,34 @@ class NoteExporter:
         front_matter.append(f"readCount: {note_info.get('readCount', 0)}")
         front_matter.append(f"attachmentCount: {note_info.get('attachmentCount', 0)}")
         front_matter.append("---")
-        # 组合front matter和内容
+        # Объединение вводной части и основного содержания
         return "\n".join(front_matter) + "\n\n" + md_content
 
     def _process_collaboration_resources(self, doc_guid, markdown_content, note_assets_dir):
-        """处理协作笔记的资源（图片和附件）"""
-        # 处理图片链接 ![图片](filename.png)
+        """Работа с ресурсами (изображениями и вложениями) в совместных заметках"""
+        # Обработка ссылки на изображение ![Изображение](filename.png)
         image_pattern = r'!\[([^\]]*)\]\(([^)]+)\)'
         images = re.findall(image_pattern, markdown_content)
 
         if images:
             note_assets_dir.mkdir(exist_ok=True)
 
-            # 获取协作笔记token
+            # Получить совместные заметки token
             try:
                 token = self._get_collaboration_token(doc_guid)
             except Exception as e:
-                logging.error(f"获取协作笔记token失败: {e}")
+                logging.error(f"Не удалось получить токен для совместной заметки: {e}")
                 return markdown_content
 
             for alt_text, image_src in images:
-                # 下载图片资源
+                # Скачать графические ресурсы
                 if self._download_collaboration_image(doc_guid, image_src, note_assets_dir, token):
-                    # 替换图片链接为相对路径
+                    # Замените ссылки на изображения относительными путями.
                     old_link = f'![{alt_text}]({image_src})'
                     new_link = f'![{alt_text}]({note_assets_dir.name}/{image_src})'
                     markdown_content = markdown_content.replace(old_link, new_link)
 
-        # 处理附件链接 [filename](wiz-collab-attachment://guid)
+        # Обработка ссылок на вложения [filename](wiz-collab-attachment://guid)
         attachment_pattern = r'\[([^\]]+)\]\(wiz-collab-attachment://([^)]+)\)'
         attachments = re.findall(attachment_pattern, markdown_content)
 
@@ -346,10 +349,10 @@ class NoteExporter:
                 return markdown_content
 
             for att_name, att_guid in attachments:
-                # 下载附件（使用相同的图片下载接口）
+                # Скачать вложение (с использованием того же интерфейса загрузки изображений)
                 if self._download_collaboration_image(doc_guid, att_guid, note_assets_dir, token, att_name):
-                    logging.info(f"成功下载协作笔记附件: {att_name}")
-                    # 替换附件链接为相对路径
+                    logging.info(f"Вложение к совместной заметке успешно загружено: {att_name}")
+                    # Замените ссылки на вложения относительными путями.
                     old_link = f'[{att_name}](wiz-collab-attachment://{att_guid})'
                     new_link = f'[{att_name}]({note_assets_dir.name}/{att_name})'
                     markdown_content = markdown_content.replace(old_link, new_link)
